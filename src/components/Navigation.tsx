@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import { Button } from './ui/button';
-import leafLogo from 'figma:asset/1412fa805ffd9f4d2e9213ed47a1296a51bb48e3.png';
+import { apiClient } from '../../lib/api';
 
 interface NavigationProps {
   onLoginClick: () => void;
@@ -11,8 +11,38 @@ interface NavigationProps {
   onLogout: () => void;
 }
 
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  profile_image?: string;
+}
+
 export function Navigation({ onLoginClick, onNavigate, currentPage, isLoggedIn, onLogout }: NavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchUserProfile();
+    }
+  }, [isLoggedIn]);
+
+  const fetchUserProfile = async () => {
+  try {
+    const userData: any = await apiClient.request('/users/me');
+    setUser(userData);
+  } catch (error) {
+    console.error('Failed to fetch user profile');
+  }
+};
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    onLogout();
+  };
 
   const navItems = [
     { name: 'Home', id: 'home' },
@@ -21,11 +51,14 @@ export function Navigation({ onLoginClick, onNavigate, currentPage, isLoggedIn, 
     { name: 'Dashboard', id: 'dashboard' },
   ];
 
+  if (user?.role === 'ngo_admin') {
+    navItems.push({ name: 'Admin', id: 'admin' });
+  }
+
   return (
     <nav className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
           <div 
             className="flex items-center gap-2 cursor-pointer"
             onClick={() => onNavigate('home')}
@@ -37,7 +70,6 @@ export function Navigation({ onLoginClick, onNavigate, currentPage, isLoggedIn, 
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
               >
-                {/* Simple heart shape */}
                 <path
                   d="M50 85 C45 80 15 60 15 35 C15 20 25 10 35 10 C42 10 47 14 50 20 C53 14 58 10 65 10 C75 10 85 20 85 35 C85 60 55 80 50 85 Z"
                   fill="#10B981"
@@ -50,13 +82,12 @@ export function Navigation({ onLoginClick, onNavigate, currentPage, isLoggedIn, 
             </span>
           </div>
 
-          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8 cursor-pointer">
             {navItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`text-gray-700 cursor-pointer hover:text-blue-600, transition-colors ${
+                className={`text-gray-700 cursor-pointer hover:text-blue-600 transition-colors ${
                   currentPage === item.id ? 'text-blue-600' : ''
                 }`}
               >
@@ -65,20 +96,21 @@ export function Navigation({ onLoginClick, onNavigate, currentPage, isLoggedIn, 
             ))}
           </div>
 
-          {/* Desktop Auth Buttons */}
-          <div className="hidden md:flex items-center gap-4 ">
+          <div className="hidden md:flex items-center gap-4">
             {isLoggedIn ? (
-              <Button onClick={onLogout} variant="outline">
-                Logout
-              </Button>
+              <div className="flex items-center gap-4">
+                <span className="text-gray-700">Hello, {user?.name || 'User'}</span>
+                <Button onClick={handleLogout} variant="outline">
+                  Logout
+                </Button>
+              </div>
             ) : (
-              <Button onClick={onLoginClick} className="cursor-pointer">
+              <Button onClick={onLoginClick} className="cursor-pointer bg-white border border-gray-300 text-gray-600">
                 Login / Sign Up
               </Button>
             )}
           </div>
 
-          {/* Mobile Menu Button */}
           <button
             className="md:hidden p-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -92,7 +124,6 @@ export function Navigation({ onLoginClick, onNavigate, currentPage, isLoggedIn, 
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-200">
           <div className="px-4 py-4 space-y-3">
@@ -112,11 +143,16 @@ export function Navigation({ onLoginClick, onNavigate, currentPage, isLoggedIn, 
             ))}
             <div className="pt-2 border-t border-gray-200">
               {isLoggedIn ? (
-                <Button onClick={onLogout} variant="outline" className="w-full">
-                  Logout
-                </Button>
+                <div className="space-y-3">
+                  <div className="px-4 py-2 text-sm text-gray-600">
+                    Hello, {user?.name || 'User'}
+                  </div>
+                  <Button onClick={handleLogout} variant="outline" className="w-full">
+                    Logout
+                  </Button>
+                </div>
               ) : (
-                <Button onClick={onLoginClick} className="w-full">
+                <Button onClick={onLoginClick} className="w-full ">
                   Login / Sign Up
                 </Button>
               )}

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // ADD: useEffect
 import { Cake, Calendar, Users, Heart, Gift, PartyPopper } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import {ImageWithFallback} from './Resources/ImageWithFallback'
+import { ImageWithFallback } from './Resources/ImageWithFallback'
 import {
   Select,
   SelectContent,
@@ -12,6 +12,15 @@ import {
   SelectValue,
 } from './ui/select';
 import { toast } from 'sonner';
+import { apiClient } from '../../lib/api'; // ADD: API client
+
+// ADD: Interface for backend NGO data
+interface NGO {
+  _id: string;
+  name: string;
+  description: string;
+  category: string[];
+}
 
 interface CelebrationPageProps {
   onBookCelebration: (data: CelebrationBooking) => void;
@@ -36,6 +45,25 @@ export function CelebrationPage({ onBookCelebration }: CelebrationPageProps) {
     message: '',
   });
 
+  // ADD: State for backend NGOs
+  const [ngos, setNgos] = useState<NGO[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // ADD: Fetch NGOs from backend
+  useEffect(() => {
+    fetchNGOs();
+  }, []);
+
+  const fetchNGOs = async () => {
+  try {
+    const ngosData: any = await apiClient.request('/ngos');
+    setNgos(ngosData);
+  } catch (error) {
+    console.error('Failed to fetch NGOs:', error);
+    toast.error('Failed to load NGO partners');
+  }
+};
+
   const eventTypes = [
     { value: 'birthday', label: 'Birthday', icon: Cake },
     { value: 'anniversary', label: 'Anniversary', icon: Heart },
@@ -44,14 +72,7 @@ export function CelebrationPage({ onBookCelebration }: CelebrationPageProps) {
     { value: 'memorial', label: 'Memorial', icon: Gift },
   ];
 
-  const ngos = [
-    'City Food Bank',
-    'Happy Paws Shelter',
-    'Youth Mentorship',
-    'Environmental Care',
-    'Elder Care Network',
-    'Green Spaces Initiative',
-  ];
+  // REMOVE: Hardcoded NGOs array since we're fetching from backend
 
   const celebrationIdeas = [
     {
@@ -71,18 +92,55 @@ export function CelebrationPage({ onBookCelebration }: CelebrationPageProps) {
     },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // UPDATE: Handle form submission with backend API
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onBookCelebration(formData);
-    toast.success('Celebration event booked successfully!');
-    setFormData({
-      eventType: '',
-      date: '',
-      ngo: '',
-      people: 1,
-      name: '',
-      message: '',
-    });
+    setLoading(true);
+
+    try {
+      // Find the selected NGO ID
+      const selectedNGO = ngos.find(ngo => ngo.name === formData.ngo);
+      
+      if (!selectedNGO) {
+        toast.error('Please select a valid NGO partner');
+        return;
+      }
+
+      // Send to backend
+      await apiClient.request('/celebrations', {
+        method: 'POST',
+        body: JSON.stringify({
+          event_type: formData.eventType, // Match backend field name
+          date: formData.date,
+          ngo_id: selectedNGO._id, // Use NGO ID instead of name
+          number_of_people: formData.people, // Match backend field name
+          event_name: formData.name, // Match backend field name
+          message: formData.message,
+          // ADD: User ID will be handled by backend auth
+        }),
+      });
+
+      // Call the original prop function if needed
+      onBookCelebration(formData);
+      
+      toast.success('Celebration event booked successfully!');
+      
+      // Reset form
+      setFormData({
+        eventType: '',
+        date: '',
+        ngo: '',
+        people: 1,
+        name: '',
+        message: '',
+      });
+
+    } catch (error: any) {
+      console.error('Booking failed:', error);
+      toast.error(error.message || 'Failed to book celebration event');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -101,7 +159,7 @@ export function CelebrationPage({ onBookCelebration }: CelebrationPageProps) {
         </div>
 
         {/* Celebration Ideas */}
-        <div className="grid md:grid-cols-3 gap-8 mb-12">
+        <div className="grid md:grid-cols-3 gap-8 mb-12 ">
           {celebrationIdeas.map((idea, index) => (
             <div
               key={index}
@@ -122,7 +180,7 @@ export function CelebrationPage({ onBookCelebration }: CelebrationPageProps) {
 
         {/* Booking Form */}
         <div className="max-w-3xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-lg p-8">
+          <div className=" rounded-2xl shadow-lg p-8  bg-white border border-gray-300 text-gray-600">
             <h2 className="text-gray-900 mb-6">Book Your Celebration Event</h2>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -130,23 +188,23 @@ export function CelebrationPage({ onBookCelebration }: CelebrationPageProps) {
               <div>
                 <Label htmlFor="eventType">Event Type *</Label>
                 <Select
-                    value={formData.eventType || ""} // ensure string, even if initially undefined
-                    onValueChange={(value: string) =>
-                      setFormData({ ...formData, eventType: value })
-                    }
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select event type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {eventTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  value={formData.eventType || ""}
+                  onValueChange={(value: string) =>
+                    setFormData({ ...formData, eventType: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select event type" />
+                  </SelectTrigger>
+                  <SelectContent className='text-black bg-white'>
+                    {eventTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Name */}
@@ -195,11 +253,11 @@ export function CelebrationPage({ onBookCelebration }: CelebrationPageProps) {
                 </div>
               </div>
 
-              {/* NGO Selection */}
+              {/* NGO Selection - UPDATE: Use backend NGOs */}
               <div>
                 <Label htmlFor="ngo">Choose NGO Partner *</Label>
-                <Select
-                  value={formData.ngo || ""} // ensure string, even if undefined
+                <Select 
+                  value={formData.ngo || ""}
                   onValueChange={(value: string) =>
                     setFormData({ ...formData, ngo: value })
                   }
@@ -208,15 +266,17 @@ export function CelebrationPage({ onBookCelebration }: CelebrationPageProps) {
                   <SelectTrigger>
                     <SelectValue placeholder="Select NGO" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className='text-black bg-white'>
                     {ngos.map((ngo) => (
-                      <SelectItem key={ngo} value={ngo}>
-                        {ngo}
+                      <SelectItem key={ngo._id} value={ngo.name}>
+                        {ngo.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-
+                {ngos.length === 0 && (
+                  <p className="text-sm text-gray-500 mt-1">Loading NGO partners...</p>
+                )}
               </div>
 
               {/* Message */}
@@ -234,9 +294,23 @@ export function CelebrationPage({ onBookCelebration }: CelebrationPageProps) {
                 />
               </div>
 
-              <Button type="submit" size="lg" className="w-full bg-gradient-to-r cursor-pointer from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
-                <PartyPopper className="mr-2 w-5 h-5" />
-                Book Celebration Event
+              <Button 
+                type="submit" 
+                size="lg" 
+                className="w-full bg-gradient-to-r cursor-pointer from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Booking...
+                  </>
+                ) : (
+                  <>
+                    <PartyPopper className="mr-2 w-5 h-5" />
+                    Book Celebration Event
+                  </>
+                )}
               </Button>
             </form>
           </div>

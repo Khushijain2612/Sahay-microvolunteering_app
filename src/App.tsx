@@ -1,78 +1,109 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigation } from './components/Navigation';
-import { Footer } from './components/Footer';
-import { LoginModal } from './components/LoginModal';
 import { HomePage } from './components/HomePage';
 import { OpportunitiesPage } from './components/OpportunitiesPage';
-import { CelebrationPage, CelebrationBooking } from './components/CelebrationPage';
+import { CelebrationPage } from './components/CelebrationPage';
 import { VolunteerDashboard } from './components/VolunteerDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
-// import { AboutPage } from './components/AboutPage';
-import { Toaster } from './components/ui/sonner';
-import { toast } from 'sonner';
+import { LoginModal } from './components/LoginModal';
+import { apiClient } from '../lib/api';
 
-type Page = 'home' | 'opportunities' | 'celebration' | 'dashboard' ;
+// CHANGE: Make Page type match what components expect
+type Page = 'home' | 'opportunities' | 'celebration' | 'dashboard' | 'admin';
+// type User = {
+//   id: number;
+//   name: string;
+//   email: string;
+//   role: string;
+// };
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState<'volunteer' | 'ngo'>('volunteer');
-  
-  // Mock user data
-  const [user, setUser] = useState({
-    name: 'Alex Johnson',
-    email: 'alex@email.com',
-    totalHours: 32,
-    badge: 'silver' as 'bronze' | 'silver' | 'gold',
-    rating: 4.8,
-  });
+  const [user, setUser] = useState(null);
 
-  const handleNavigate = (page: string) => {
-    if (page === 'dashboard' && !isLoggedIn) {
-      setIsLoginModalOpen(true);
-      toast.error('Please login to access the dashboard');
-      return;
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      setIsLoggedIn(true);
+      fetchUserProfile();
     }
-    setCurrentPage(page as Page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleLogin = (email: string, role: 'volunteer' | 'ngo') => {
+const fetchUserProfile = async () => {
+  try {
+    const userData = await apiClient.request('/users/me');
+    setUser(userData as any); // or userData as User if you define the type
+  } catch (error) {
+    handleLogout();
+  }
+};
+
+  const handleLogin = (email: string, role: string) => {
     setIsLoggedIn(true);
-    setUserRole(role);
-    setUser({
-      ...user,
-      email,
-    });
-    toast.success(`Welcome back, ${role === 'volunteer' ? 'Volunteer' : 'Admin'}!`);
-    setCurrentPage('dashboard');
+    setShowLoginModal(false);
+    fetchUserProfile();
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
     setIsLoggedIn(false);
+    setUser(null);
     setCurrentPage('home');
-    toast.success('Logged out successfully');
   };
 
-  const handleBookSlot = (opportunityId: number) => {
+  const handleBookSlot = async (opportunityId: string) => {
     if (!isLoggedIn) {
-      setIsLoginModalOpen(true);
-      toast.error('Please login to book a slot');
+      setShowLoginModal(true);
       return;
     }
-    toast.success('Slot booked successfully! NGO will review your request.');
+
+    try {
+      await apiClient.createBooking(opportunityId);
+      alert('Successfully booked!');
+    } catch (error: any) {
+      alert(error.message || 'Booking failed');
+    }
   };
 
-  const handleBookCelebration = (data: CelebrationBooking) => {
+  const handleBookCelebration = async (celebrationData: any) => {
     if (!isLoggedIn) {
-      setIsLoginModalOpen(true);
+      setShowLoginModal(true);
       return;
     }
-    console.log('Celebration booking:', data);
+
+    try {
+      await apiClient.request('/celebrations', {
+        method: 'POST',
+        body: JSON.stringify(celebrationData),
+      });
+      alert('Celebration booked successfully!');
+    } catch (error: any) {
+      alert(error.message || 'Failed to book celebration');
+    }
   };
 
-  const renderPage = () => {
+  // FIX: Type-safe navigation handler
+  const handleNavigate = (page: string) => {
+    if (isValidPage(page)) {
+      setCurrentPage(page as Page);
+    } else {
+      console.warn(`Invalid page: ${page}`);
+      setCurrentPage('home');
+    }
+  };
+
+  // FIX: Helper function to validate page
+  const isValidPage = (page: string): page is Page => {
+    return ['home', 'opportunities', 'celebration', 'dashboard', 'admin'].includes(page);
+  };
+
+  const renderCurrentPage = () => {
     switch (currentPage) {
       case 'home':
         return <HomePage onNavigate={handleNavigate} />;
@@ -81,44 +112,31 @@ export default function App() {
       case 'celebration':
         return <CelebrationPage onBookCelebration={handleBookCelebration} />;
       case 'dashboard':
-        if (!isLoggedIn) {
-          return <HomePage onNavigate={handleNavigate} />;
-        }
-        return userRole === 'volunteer' ? (
-          <VolunteerDashboard user={user} />
-        ) : (
-          <AdminDashboard />
-        );
-      // case 'about':
-      //   return <AboutPage />;
+        return <VolunteerDashboard />;
+      case 'admin':
+        return <AdminDashboard />;
       default:
         return <HomePage onNavigate={handleNavigate} />;
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-white">
       <Navigation
-        onLoginClick={() => setIsLoginModalOpen(true)}
+        onLoginClick={() => setShowLoginModal(true)}
         onNavigate={handleNavigate}
         currentPage={currentPage}
         isLoggedIn={isLoggedIn}
         onLogout={handleLogout}
       />
       
-      <main className="flex-1">
-        {renderPage()}
-      </main>
-
-      <Footer onNavigate={handleNavigate} />
+      {renderCurrentPage()}
 
       <LoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
         onLogin={handleLogin}
       />
-
-      <Toaster position="top-right" />
     </div>
   );
 }

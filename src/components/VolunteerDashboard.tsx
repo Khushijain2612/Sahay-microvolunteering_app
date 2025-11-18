@@ -4,19 +4,110 @@ import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { Card } from './ui/card';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-interface VolunteerDashboardProps {
-  user: {
-    name: string;
-    email: string;
-    totalHours: number;
-    badge: 'bronze' | 'silver' | 'gold';
-    rating: number;
+import { useState, useEffect } from 'react';
+import { apiClient } from '../../lib/api';
+interface user {
+  _id: string;
+  name: string;
+  email: string;
+  total_hours: number; 
+  badge: 'none' | 'bronze' | 'silver' | 'gold'; 
+  rating: number;
+  skills: string[];
+}
+interface Booking {
+  _id: string;
+  opportunity_id: {
+    _id: string;
+    title: string;
+    date: string;
+    ngo_id: {
+      name: string;
+    };
   };
+  status: string;
+  hours_completed?: number;
+  rating?: number;
 }
 
-export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
-  const badges = {
+export function VolunteerDashboard() {
+  const [user, setUser] = useState<user | null>(null);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+ const fetchDashboardData = async () => {
+  try {
+    setLoading(true);
+    
+    // FIX: Type the response as any to avoid TypeScript errors
+    const userData: any = await apiClient.request('/users/me');
+    setUser(userData);
+    
+    const bookingsData: any = await apiClient.request('/bookings/user');
+    setBookings(bookingsData);
+    
+  } catch (error) {
+    console.error('Failed to fetch dashboard data:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+    const calculateTotalHours = () => {
+    return bookings
+      .filter(booking => booking.status === 'completed' && booking.hours_completed)
+      .reduce((total, booking) => total + (booking.hours_completed || 0), 0);
+  };
+
+  const calculateMonthlyData = () => {
+    const monthlyHours: { [key: string]: number } = {};
+    
+    bookings
+      .filter(booking => booking.status === 'completed' && booking.hours_completed)
+      .forEach(booking => {
+        const month = new Date(booking.opportunity_id.date).toLocaleDateString('en-US', { 
+          month: 'short', 
+          year: '2-digit' 
+        });
+        monthlyHours[month] = (monthlyHours[month] || 0) + (booking.hours_completed || 0);
+      });
+    
+      const months = [];
+    const today = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      months.push({
+        month: monthKey,
+        hours: monthlyHours[monthKey] || 0
+      });
+    }
+    
+    return months;
+  };
+
+  const calculateAverageRating = () => {
+    const ratedBookings = bookings.filter(booking => booking.rating);
+    if (ratedBookings.length === 0) return 0;
+    
+    const totalRating = ratedBookings.reduce((sum, booking) => sum + (booking.rating || 0), 0);
+    return totalRating / ratedBookings.length;
+  };
+  const realTotalHours = calculateTotalHours();
+  const monthlydata = calculateMonthlyData();
+  const realAverageRating = calculateAverageRating();
+  const completedTasksCount = bookings.filter(booking => booking.status === 'completed').length;
+    const badges = {
+    none: {
+      name: 'No Badge Yet',
+      color: 'from-gray-400 to-gray-300',
+      icon: '🔰',
+      requirement: '0+ hours',
+    },
     bronze: {
       name: 'Bronze Volunteer',
       color: 'from-amber-700 to-amber-500',
@@ -36,65 +127,99 @@ export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
       requirement: '50+ hours',
     },
   };
+    const determineBadge = () => {
+    if (user?.badge && user.badge !== 'none') return user.badge;
+    
+    if (realTotalHours >= 50) return 'gold';
+    if (realTotalHours >= 25) return 'silver';
+    if (realTotalHours >= 10) return 'bronze';
+    return 'none';
+  };
+   const userBadge = determineBadge();
+  const currentBadge = badges[userBadge];
 
-  const currentBadge = badges[user.badge];
-  const nextBadgeHours = user.badge === 'bronze' ? 25 : user.badge === 'silver' ? 50 : 100;
-  const progressToNext = ((user.totalHours % nextBadgeHours) / nextBadgeHours) * 100;
+  const nextBadgeHours = 
+    userBadge === 'none' ? 10 : 
+    userBadge === 'bronze' ? 25 : 
+    userBadge === 'silver' ? 50 : 100;
 
-  const upcomingTasks = [
-    {
-      id: 1,
-      title: 'Food Distribution Support',
-      ngo: 'City Food Bank',
-      date: '2025-11-05',
+  const progressToNext = userBadge === 'gold' ? 100 : 
+    Math.min(100, (realTotalHours / nextBadgeHours) * 100);
+
+  // const upcomingTasks = [
+  //   {
+  //     id: 1,
+  //     title: 'Food Distribution Support',
+  //     ngo: 'City Food Bank',
+  //     date: '2025-11-05',
+  //     time: '10:00 AM',
+  //     duration: '2 hours',
+  //   },
+  //   {
+  //     id: 2,
+  //     title: 'Youth Tutoring Session',
+  //     ngo: 'Youth Mentorship',
+  //     date: '2025-11-07',
+  //     time: '3:00 PM',
+  //     duration: '1 hour',
+  //   },
+  // ];
+
+  // const pastActivity = [
+  //   {
+  //     id: 1,
+  //     title: 'Beach Cleanup Drive',
+  //     ngo: 'Environmental Care',
+  //     date: '2025-10-28',
+  //     hours: 2,
+  //     rating: 5,
+  //   },
+  //   {
+  //     id: 2,
+  //     title: 'Senior Companionship',
+  //     ngo: 'Elder Care Network',
+  //     date: '2025-10-25',
+  //     hours: 1,
+  //     rating: 5,
+  //   },
+  //   {
+  //     id: 3,
+  //     title: 'Animal Shelter Care',
+  //     ngo: 'Happy Paws Shelter',
+  //     date: '2025-10-20',
+  //     hours: 3,
+  //     rating: 4,
+  //   },
+  // ];
+  const upcomingTasks = bookings
+    .filter(booking => booking.status === 'confirmed' || booking.status === 'pending')
+    .map(booking => ({
+      id: booking._id,
+      title: booking.opportunity_id.title,
+      ngo: booking.opportunity_id.ngo_id.name,
+      date: booking.opportunity_id.date,
       time: '10:00 AM',
       duration: '2 hours',
-    },
-    {
-      id: 2,
-      title: 'Youth Tutoring Session',
-      ngo: 'Youth Mentorship',
-      date: '2025-11-07',
-      time: '3:00 PM',
-      duration: '1 hour',
-    },
-  ];
+    }));
+    const pastActivity = bookings
+    .filter(booking => booking.status === 'completed' && booking.hours_completed)
+    .map(booking => ({
+      id: booking._id,
+      title: booking.opportunity_id.title,
+      ngo: booking.opportunity_id.ngo_id.name,
+      date: booking.opportunity_id.date,
+      hours: booking.hours_completed || 0,
+      rating: booking.rating || 5,
+    }));
 
-  const pastActivity = [
-    {
-      id: 1,
-      title: 'Beach Cleanup Drive',
-      ngo: 'Environmental Care',
-      date: '2025-10-28',
-      hours: 2,
-      rating: 5,
-    },
-    {
-      id: 2,
-      title: 'Senior Companionship',
-      ngo: 'Elder Care Network',
-      date: '2025-10-25',
-      hours: 1,
-      rating: 5,
-    },
-    {
-      id: 3,
-      title: 'Animal Shelter Care',
-      ngo: 'Happy Paws Shelter',
-      date: '2025-10-20',
-      hours: 3,
-      rating: 4,
-    },
-  ];
-
-  const monthlyData = [
-    { month: 'Jun', hours: 5 },
-    { month: 'Jul', hours: 8 },
-    { month: 'Aug', hours: 12 },
-    { month: 'Sep', hours: 15 },
-    { month: 'Oct', hours: 22 },
-    { month: 'Nov', hours: user.totalHours },
-  ];
+  // const monthlyData = [
+  //   { month: 'Jun', hours: 5 },
+  //   { month: 'Jul', hours: 8 },
+  //   { month: 'Aug', hours: 12 },
+  //   { month: 'Sep', hours: 15 },
+  //   { month: 'Oct', hours: 22 },
+  //   { month: 'Nov', hours: user.totalHours },
+  // ];
 
   const reviews = [
     {
@@ -116,7 +241,7 @@ export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-gray-900 mb-2">Welcome back, {user.name}!</h1>
+          <h1 className="text-gray-900 mb-2">Welcome back, {user?.name}!</h1>
           <p className="text-gray-600">Here's your volunteering journey</p>
         </div>
 
@@ -128,7 +253,7 @@ export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
                 <Clock className="w-6 h-6 text-blue-600" />
               </div>
             </div>
-            <div className="text-gray-900">{user.totalHours} Hours</div>
+            <div className="text-gray-900">{realTotalHours} Hours</div>
             <p className="text-sm text-gray-600">Total Volunteered</p>
           </Card>
 
@@ -148,7 +273,7 @@ export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
                 <Star className="w-6 h-6 text-green-600" />
               </div>
             </div>
-            <div className="text-gray-900">{user.rating.toFixed(1)} / 5.0</div>
+            <div className="text-gray-900">{realAverageRating.toFixed(1)} / 5.0</div>
             <p className="text-sm text-gray-600">Average Rating</p>
           </Card>
 
@@ -158,7 +283,7 @@ export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
                 <TrendingUp className="w-6 h-6 text-purple-600" />
               </div>
             </div>
-            <div className="text-gray-900">{pastActivity.length}</div>
+            <div className="text-gray-900">{completedTasksCount}</div>
             <p className="text-sm text-gray-600">Tasks Completed</p>
           </Card>
         </div>
@@ -182,13 +307,13 @@ export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-gray-900">{currentBadge.name}</h3>
-                    <span className="text-sm text-gray-600">{user.totalHours} hours</span>
+                    <span className="text-sm text-gray-600">{realTotalHours} hours</span>
                   </div>
                   <Progress value={progressToNext} className="mb-2" />
                   <p className="text-sm text-gray-600">
-                    {user.badge === 'gold' 
+                    {userBadge === 'gold' 
                       ? 'You\'ve reached the highest badge! Keep volunteering!'
-                      : `${nextBadgeHours - user.totalHours} hours to next badge`
+                      : `${Math.max(0, nextBadgeHours - realTotalHours)} ${userBadge === 'none' ? 'bronze' : userBadge === 'bronze' ? 'silver' : 'gold'} badge`
                     }
                   </p>
                 </div>
@@ -199,7 +324,7 @@ export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
                   <div
                     key={key}
                     className={`text-center p-4 rounded-lg ${
-                      user.badge === key ? 'bg-gray-100' : 'bg-gray-50'
+                      userBadge === key ? 'bg-gray-100' : 'bg-gray-50'
                     }`}
                   >
                     <div className="text-2xl mb-2">{badge.icon}</div>
@@ -214,7 +339,7 @@ export function VolunteerDashboard({ user }: VolunteerDashboardProps) {
             <Card className="p-6">
               <h2 className="text-gray-900 mb-6">Volunteering Growth</h2>
               <ResponsiveContainer width="100%" height={250}>
-                <AreaChart data={monthlyData}>
+                <AreaChart data={monthlydata}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />

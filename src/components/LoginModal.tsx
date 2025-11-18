@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-
+import { apiClient } from '../../lib/api';
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,20 +14,55 @@ interface LoginModalProps {
 export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState(''); 
   const [role, setRole] = useState<'volunteer' | 'ngo'>('volunteer');
-
+  const [loading, setLoading] = useState(false); 
+  const [error, setError] = useState(''); 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(email, role);
-    onClose();
+    setLoading(true);
+    setError('');
+    
+    try {
+      const data = await apiClient.login(email, password);
+      onLogin(email, role);
+      onClose();
+    } catch (error: any) {
+      setError(error.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
-
   const handleGoogleLogin = () => {
-    // Mock Google login
-    onLogin('user@gmail.com', role);
-    onClose();
+    setError('Google login coming soon!');
+    // TODO: Implement Google OAuth
+    // onLogin('user@gmail.com', role);
+    // onClose();
+  };
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    try {
+      const data = await apiClient.request('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          email, 
+          password, 
+          name, 
+          role: role === 'ngo' ? 'ngo_admin' : 'volunteer' 
+        }),
+      });
+      onLogin(email, role);
+      onClose();
+    } catch (error: any) {
+      setError(error.message || 'Signup failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -44,33 +79,38 @@ export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
           <h2 className="text-gray-900 mb-2">Welcome to Sahay</h2>
           <p className="text-gray-600">Join our community of volunteers</p>
         </div>
-
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
         <Tabs defaultValue="login" className="w-full ">
           <TabsList className="grid w-full grid-cols-2 mb-6 ">
-            <TabsTrigger value="login" className="cursor-pointer">Login</TabsTrigger>
-            <TabsTrigger value="signup" className="cursor-pointer">Sign Up</TabsTrigger>
+            <TabsTrigger value="login" className="cursor-pointer text-black">Login</TabsTrigger>
+            <TabsTrigger value="signup" className="cursor-pointer text-black">Sign Up</TabsTrigger>
           </TabsList>
 
           <TabsContent value="login">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <Label htmlFor="role">I am a</Label>
+                <Label htmlFor="role" className=" text-black">I am a</Label>
                 <select
                   id="role"
                   value={role}
                   onChange={(e) => setRole(e.target.value as 'volunteer' | 'ngo')}
-                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                 >
-                  <option value="volunteer">Volunteer</option>
+                  <option value="volunteer" >Volunteer</option>
                   <option value="ngo">NGO/Admin</option>
                 </select>
               </div>
 
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className=" text-black">Email</Label>
                 <Input
                   id="email"
                   type="email"
+                  className='border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black'
                   placeholder="your@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -79,18 +119,19 @@ export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
               </div>
 
               <div>
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className='text-black'>Password</Label>
                 <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
+                  className='border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black'
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
               </div>
 
-              <Button type="submit" className="w-full cursor-pointer">
+              <Button type="submit" className="w-full bg-black cursor-pointer ">
                 Login
               </Button>
             </form>
@@ -116,14 +157,14 @@ export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
           </TabsContent>
 
           <TabsContent value="signup">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSignup} className="space-y-4">
               <div>
-                <Label htmlFor="signup-role">I am a</Label>
+                <Label htmlFor="signup-role" className='text-black'>I am a</Label>
                 <select
                   id="signup-role"
                   value={role}
                   onChange={(e) => setRole(e.target.value as 'volunteer' | 'ngo')}
-                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                 >
                   <option value="volunteer">Volunteer</option>
                   <option value="ngo">NGO/Admin</option>
@@ -131,21 +172,23 @@ export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
               </div>
 
               <div>
-                <Label htmlFor="signup-name">Full Name</Label>
+                <Label htmlFor="signup-name" className='text-black'>Full Name</Label>
                 <Input
                   id="signup-name"
                   type="text"
+                  className='text-black'
                   placeholder="John Doe"
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="signup-email">Email</Label>
+                <Label htmlFor="signup-email" className='text-black'>Email</Label>
                 <Input
                   id="signup-email"
                   type="email"
                   placeholder="your@email.com"
+                  className='text-black'
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -153,18 +196,19 @@ export function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
               </div>
 
               <div>
-                <Label htmlFor="signup-password">Password</Label>
+                <Label htmlFor="signup-password" className='text-black'>Password</Label>
                 <Input
                   id="signup-password"
                   type="password"
                   placeholder="••••••••"
+                  className='text-black'
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
               </div>
 
-              <Button type="submit" className="w-full cursor-pointer">
+              <Button type="submit" className="w-full cursor-pointer bg-black" >
                 Create Account
               </Button>
             </form>

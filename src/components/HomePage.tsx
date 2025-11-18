@@ -1,12 +1,76 @@
 import { ArrowRight, Clock, Award, Users, Heart, CheckCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './Resources/ImageWithFallback';
+import { useState, useEffect } from 'react'; // ADD: useEffect
+import { apiClient } from '@/lib/api'; // ADD: API client
 
 interface HomePageProps {
   onNavigate: (page: string) => void;
 }
 
+// ADD: Interface for backend stats
+interface PlatformStats {
+  total_volunteers: number;
+  total_ngos: number;
+  total_hours: number;
+  completed_tasks_today: number;
+}
+
+// ADD: Interface for testimonials from backend
+interface Testimonial {
+  _id: string;
+  user_id: {
+    name: string;
+    profile_image?: string;
+  };
+  review_text: string;
+  rating: number;
+  created_at: string;
+  total_hours?: number;
+}
+
 export function HomePage({ onNavigate }: HomePageProps) {
+  // ADD: State for backend data
+  const [platformStats, setPlatformStats] = useState<PlatformStats>({
+    total_volunteers: 0,
+    total_ngos: 0,
+    total_hours: 0,
+    completed_tasks_today: 0
+  });
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ADD: Fetch platform stats and testimonials
+  useEffect(() => {
+    fetchHomePageData();
+  }, []);
+
+  const fetchHomePageData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch platform statistics
+      const statsData = await apiClient.request('/stats/platform');
+      setPlatformStats(statsData);
+      
+      // Fetch featured testimonials
+      const testimonialsData = await apiClient.request('/reviews/featured');
+      setTestimonials(testimonialsDataa);
+      
+    } catch (error) {
+      console.error('Failed to fetch homepage data:', error);
+      // Fallback to default data
+      setPlatformStats({
+        total_volunteers: 10000,
+        total_ngos: 500,
+        total_hours: 50000,
+        completed_tasks_today: 234
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const features = [
     {
       icon: Clock,
@@ -37,30 +101,6 @@ export function HomePage({ onNavigate }: HomePageProps) {
     'Animal Shelter',
     'Youth Mentorship',
     'Environmental Care',
-  ];
-
-  const testimonials = [
-    {
-      name: 'Sarah Johnson',
-      role: 'Volunteer',
-      image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-      text: 'Sahay made it so easy to fit volunteering into my busy schedule. I love that I can help even with just an hour to spare!',
-      hours: 45,
-    },
-    {
-      name: 'Michael Chen',
-      role: 'Volunteer',
-      image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100',
-      text: 'I celebrated my birthday by volunteering at a food bank through Sahay. Best birthday ever!',
-      hours: 32,
-    },
-    {
-      name: 'Emily Rodriguez',
-      role: 'Volunteer',
-      image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-      text: 'The badge system keeps me motivated. Just earned my Gold badge after 50 hours!',
-      hours: 67,
-    },
   ];
 
   return (
@@ -95,17 +135,24 @@ export function HomePage({ onNavigate }: HomePageProps) {
                   Celebrate with Us
                 </Button>
               </div>
+              {/* UPDATE: Use real platform stats */}
               <div className="flex items-center gap-8 pt-4">
                 <div>
-                  <div className="text-blue-600">10,000+</div>
+                  <div className="text-blue-600">
+                    {loading ? '...' : platformStats.total_volunteers.toLocaleString()}+
+                  </div>
                   <div className="text-sm text-gray-600">Volunteers</div>
                 </div>
                 <div>
-                  <div className="text-green-600">500+</div>
+                  <div className="text-green-600">
+                    {loading ? '...' : platformStats.total_ngos}+
+                  </div>
                   <div className="text-sm text-gray-600">NGO Partners</div>
                 </div>
                 <div>
-                  <div className="text-amber-600">50,000+</div>
+                  <div className="text-amber-600">
+                    {loading ? '...' : platformStats.total_hours.toLocaleString()}+
+                  </div>
                   <div className="text-sm text-gray-600">Hours Given</div>
                 </div>
               </div>
@@ -116,13 +163,16 @@ export function HomePage({ onNavigate }: HomePageProps) {
                 alt="Volunteers working together"
                 className="rounded-2xl shadow-2xl w-full"
               />
+              {/* UPDATE: Use real completed tasks count */}
               <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-xl shadow-lg hidden md:block">
                 <div className="flex items-center gap-4">
                   <div className="bg-green-100 p-3 rounded-full">
                     <CheckCircle className="w-6 h-6 text-green-600" />
                   </div>
                   <div>
-                    <div className="text-gray-900">234 Tasks</div>
+                    <div className="text-gray-900">
+                      {loading ? '...' : platformStats.completed_tasks_today} Tasks
+                    </div>
                     <div className="text-sm text-gray-600">Completed Today</div>
                   </div>
                 </div>
@@ -187,7 +237,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Testimonials - UPDATE: Use real testimonials from backend */}
       <section className="py-16 md:py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -198,25 +248,79 @@ export function HomePage({ onNavigate }: HomePageProps) {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
+            {testimonials.slice(0, 3).map((testimonial, index) => (
               <div
-                key={index}
+                key={testimonial._id}
                 className="bg-gradient-to-br from-blue-50 to-green-50 p-8 rounded-2xl"
               >
                 <div className="flex items-center gap-4 mb-4">
                   <ImageWithFallback
-                    src={testimonial.image}
-                    alt={testimonial.name}
+                    src={testimonial.user_id.profile_image || 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100'}
+                    alt={testimonial.user_id.name}
                     className="w-12 h-12 rounded-full object-cover"
                   />
                   <div>
-                    <div className="text-gray-900">{testimonial.name}</div>
-                    <div className="text-sm text-gray-600">{testimonial.hours} hours volunteered</div>
+                    <div className="text-gray-900">{testimonial.user_id.name}</div>
+                    <div className="text-sm text-gray-600">
+                      {testimonial.total_hours || 'Multiple'} hours volunteered
+                    </div>
                   </div>
                 </div>
-                <p className="text-gray-700 italic">"{testimonial.text}"</p>
+                <p className="text-gray-700 italic">"{testimonial.review_text}"</p>
+                <div className="flex items-center gap-1 mt-3">
+                  {Array.from({ length: testimonial.rating }).map((_, i) => (
+                    <span key={i} className="text-yellow-500">★</span>
+                  ))}
+                </div>
               </div>
             ))}
+            {/* Fallback if no testimonials from backend */}
+            {testimonials.length === 0 && (
+              <>
+                <div className="bg-gradient-to-br from-blue-50 to-green-50 p-8 rounded-2xl">
+                  <div className="flex items-center gap-4 mb-4">
+                    <ImageWithFallback
+                      src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100"
+                      alt="Sarah Johnson"
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                    <div>
+                      <div className="text-gray-900">Sarah Johnson</div>
+                      <div className="text-sm text-gray-600">45 hours volunteered</div>
+                    </div>
+                  </div>
+                  <p className="text-gray-700 italic">"Sahay made it so easy to fit volunteering into my busy schedule. I love that I can help even with just an hour to spare!"</p>
+                </div>
+                <div className="bg-gradient-to-br from-blue-50 to-green-50 p-8 rounded-2xl">
+                  <div className="flex items-center gap-4 mb-4">
+                    <ImageWithFallback
+                      src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100"
+                      alt="Michael Chen"
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                    <div>
+                      <div className="text-gray-900">Michael Chen</div>
+                      <div className="text-sm text-gray-600">32 hours volunteered</div>
+                    </div>
+                  </div>
+                  <p className="text-gray-700 italic">"I celebrated my birthday by volunteering at a food bank through Sahay. Best birthday ever!"</p>
+                </div>
+                <div className="bg-gradient-to-br from-blue-50 to-green-50 p-8 rounded-2xl">
+                  <div className="flex items-center gap-4 mb-4">
+                    <ImageWithFallback
+                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100"
+                      alt="Emily Rodriguez"
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                    <div>
+                      <div className="text-gray-900">Emily Rodriguez</div>
+                      <div className="text-sm text-gray-600">67 hours volunteered</div>
+                    </div>
+                  </div>
+                  <p className="text-gray-700 italic">"The badge system keeps me motivated. Just earned my Gold badge after 50 hours!"</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -226,7 +330,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-white mb-4">Ready to Make a Difference?</h2>
           <p className="text-blue-100 mb-8">
-            Join thousands of volunteers who are changing lives, one hour at a time.
+            Join {loading ? 'thousands of' : platformStats.total_volunteers.toLocaleString()} volunteers who are changing lives, one hour at a time.
           </p>
           <Button
             size="lg"

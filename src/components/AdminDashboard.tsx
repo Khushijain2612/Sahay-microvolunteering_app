@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Users, CheckCircle, Clock, Star, Edit, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -7,116 +7,249 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { toast } from 'sonner';
+import { apiClient } from '../../lib/api';
+interface Task {
+  _id: string;
+  title: string;
+  date: string;
+  duration_hours: number;
+  total_spots: number;
+  filled_spots: number;
+  status: 'active' | 'completed' | 'cancelled';
+  location: {
+    address: string;
+  };
+  description: string;
+}
 
+interface Volunteer {
+  _id: string;
+  name: string;
+  email: string;
+  total_hours: number;
+  badge: 'none' | 'bronze' | 'silver' | 'gold';
+  rating: number;
+  completed_opportunities: number;
+}
+
+interface Booking {
+  _id: string;
+  volunteer_id: {
+    name: string;
+    email: string;
+  };
+  opportunity_id: {
+    title: string;
+    date: string;
+  };
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+}
 export function AdminDashboard() {
   const [showNewTaskForm, setShowNewTaskForm] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
-    duration: '',
+    duration_hours: 0,
     date: '',
     location: '',
-    spots: 0,
+    total_spots: 0,
     description: '',
   });
 
-  const tasks = [
-    {
-      id: 1,
-      title: 'Food Distribution Support',
-      date: '2025-11-05',
-      duration: '2 hours',
-      spots: 8,
-      booked: 3,
-      status: 'active',
-    },
-    {
-      id: 2,
-      title: 'Animal Shelter Care',
-      date: '2025-11-06',
-      duration: '3 hours',
-      spots: 4,
-      booked: 4,
-      status: 'full',
-    },
-    {
-      id: 3,
-      title: 'Beach Cleanup Drive',
-      date: '2025-10-28',
-      duration: '2 hours',
-      spots: 20,
-      booked: 18,
-      status: 'completed',
-    },
-  ];
+  // const tasks = [
+  //   {
+  //     id: 1,
+  //     title: 'Food Distribution Support',
+  //     date: '2025-11-05',
+  //     duration: '2 hours',
+  //     spots: 8,
+  //     booked: 3,
+  //     status: 'active',
+  //   },
+  //   {
+  //     id: 2,
+  //     title: 'Animal Shelter Care',
+  //     date: '2025-11-06',
+  //     duration: '3 hours',
+  //     spots: 4,
+  //     booked: 4,
+  //     status: 'full',
+  //   },
+  //   {
+  //     id: 3,
+  //     title: 'Beach Cleanup Drive',
+  //     date: '2025-10-28',
+  //     duration: '2 hours',
+  //     spots: 20,
+  //     booked: 18,
+  //     status: 'completed',
+  //   },
+  // ];
 
-  const volunteers = [
-    {
-      id: 1,
-      name: 'Sarah Johnson',
-      email: 'sarah@email.com',
-      totalHours: 45,
-      badge: 'silver',
-      rating: 4.9,
-      tasksCompleted: 12,
-    },
-    {
-      id: 2,
-      name: 'Michael Chen',
-      email: 'michael@email.com',
-      totalHours: 32,
-      badge: 'silver',
-      rating: 4.8,
-      tasksCompleted: 9,
-    },
-    {
-      id: 3,
-      name: 'Emily Rodriguez',
-      email: 'emily@email.com',
-      totalHours: 67,
-      badge: 'gold',
-      rating: 5.0,
-      tasksCompleted: 18,
-    },
-  ];
+  // const volunteers = [
+  //   {
+  //     id: 1,
+  //     name: 'Sarah Johnson',
+  //     email: 'sarah@email.com',
+  //     totalHours: 45,
+  //     badge: 'silver',
+  //     rating: 4.9,
+  //     tasksCompleted: 12,
+  //   },
+  //   {
+  //     id: 2,
+  //     name: 'Michael Chen',
+  //     email: 'michael@email.com',
+  //     totalHours: 32,
+  //     badge: 'silver',
+  //     rating: 4.8,
+  //     tasksCompleted: 9,
+  //   },
+  //   {
+  //     id: 3,
+  //     name: 'Emily Rodriguez',
+  //     email: 'emily@email.com',
+  //     totalHours: 67,
+  //     badge: 'gold',
+  //     rating: 5.0,
+  //     tasksCompleted: 18,
+  //   },
+  // ];
 
-  const pendingBookings = [
-    {
-      id: 1,
-      volunteer: 'Sarah Johnson',
-      task: 'Food Distribution Support',
-      date: '2025-11-05',
-      status: 'pending',
-    },
-    {
-      id: 2,
-      volunteer: 'Michael Chen',
-      task: 'Youth Tutoring Session',
-      date: '2025-11-07',
-      status: 'pending',
-    },
-  ];
+  // const pendingBookings = [
+  //   {
+  //     id: 1,
+  //     volunteer: 'Sarah Johnson',
+  //     task: 'Food Distribution Support',
+  //     date: '2025-11-05',
+  //     status: 'pending',
+  //   },
+  //   {
+  //     id: 2,
+  //     volunteer: 'Michael Chen',
+  //     task: 'Youth Tutoring Session',
+  //     date: '2025-11-07',
+  //     status: 'pending',
+  //   },
+  // ];
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  // const handleCreateTask = (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   toast.success('New task created successfully!');
+  //   setShowNewTaskForm(false);
+  //   setNewTask({
+  //     title: '',
+  //     duration: '',
+  //     date: '',
+  //     location: '',
+  //     spots: 0,
+  //     description: '',
+  //   });
+  // };
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
+  const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+   useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      const tasksData: any = await apiClient.request('/opportunities/ngo');
+      setTasks(tasksData);
+
+      // Fetch volunteers (you might need to create this endpoint)
+      const volunteersData: any = await apiClient.request('/admin/volunteers');
+      setVolunteers(volunteersData);
+
+      // Fetch pending bookings
+      const bookingsData: any = await apiClient.request('/bookings/pending');
+      setPendingBookings(bookingsData);
+    } catch (error) {
+      console.error('Failed to fetch admin data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // UPDATE: Create task with real API call
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('New task created successfully!');
-    setShowNewTaskForm(false);
-    setNewTask({
-      title: '',
-      duration: '',
-      date: '',
-      location: '',
-      spots: 0,
-      description: '',
-    });
+    try {
+      await apiClient.request('/opportunities', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...newTask,
+          location: {
+            address: newTask.location,
+            type: 'onsite'
+          },
+          skills_required: [], // Add if needed
+          category: 'general' // Add if needed
+        }),
+      });
+      
+      toast.success('New task created successfully!');
+      setShowNewTaskForm(false);
+      setNewTask({
+        title: '',
+        duration_hours: 0,
+        date: '',
+        location: '',
+        total_spots: 0,
+        description: '',
+      });
+      
+      // Refresh tasks
+      fetchDashboardData();
+    } catch (error) {
+      toast.error('Failed to create task');
+    }
   };
 
-  const handleApproveBooking = (id: number) => {
-    toast.success('Booking approved!');
+  const handleApproveBooking = async (bookingId: string) => {
+    try {
+      await apiClient.request(`/bookings/${bookingId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'confirmed' }),
+      });
+      toast.success('Booking approved!');
+      fetchDashboardData(); // Refresh data
+    } catch (error) {
+      toast.error('Failed to approve booking');
+    }
   };
 
-  const handleRejectBooking = (id: number) => {
-    toast.error('Booking rejected');
+  const handleRejectBooking = async (bookingId: string) => {
+    try {
+      await apiClient.request(`/bookings/${bookingId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      toast.error('Booking rejected');
+      fetchDashboardData(); // Refresh data
+    } catch (error) {
+      toast.error('Failed to reject booking');
+    }
   };
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await apiClient.request(`/opportunities/${taskId}`, {
+        method: 'DELETE',
+      });
+      toast.success('Task deleted successfully');
+      fetchDashboardData(); // Refresh data
+    } catch (error) {
+      toast.error('Failed to delete task');
+    }
+  };
+  const activeTasksCount = tasks.filter(t => t.status === 'active').length;
+  const completedTasksCount = tasks.filter(t => t.status === 'completed').length;
+  const totalVolunteersCount = volunteers.length;
+  const pendingBookingsCount = pendingBookings.length;
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -149,12 +282,12 @@ export function AdminDashboard() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="duration">Duration</Label>
+                  <Label htmlFor="duration_hours">Duration</Label>
                   <Input
-                    id="duration"
+                    id="duration_hours"
                     placeholder="e.g., 2 hours"
-                    value={newTask.duration}
-                    onChange={(e) => setNewTask({ ...newTask, duration: e.target.value })}
+                    value={newTask.duration_hours}
+                    onChange={(e) => setNewTask({ ...newTask, duration_hours: parseInt(e.target.value) })}
                     required
                   />
                 </div>
@@ -183,8 +316,8 @@ export function AdminDashboard() {
                     id="spots"
                     type="number"
                     min="1"
-                    value={newTask.spots}
-                    onChange={(e) => setNewTask({ ...newTask, spots: parseInt(e.target.value) })}
+                    value={newTask.total_spots}
+                    onChange={(e) => setNewTask({ ...newTask, total_spots: parseInt(e.target.value) })}
                     required
                   />
                 </div>
@@ -220,28 +353,28 @@ export function AdminDashboard() {
             <div className="bg-blue-100 p-3 rounded-lg w-fit mb-4">
               <Clock className="w-6 h-6 text-blue-600" />
             </div>
-            <div className="text-gray-900">{tasks.filter(t => t.status === 'active').length}</div>
+            <div className="text-gray-900">{activeTasksCount}</div>
             <p className="text-sm text-gray-600">Active Tasks</p>
           </Card>
           <Card className="p-6">
             <div className="bg-green-100 p-3 rounded-lg w-fit mb-4">
               <Users className="w-6 h-6 text-green-600" />
             </div>
-            <div className="text-gray-900">{volunteers.length}</div>
+            <div className="text-gray-900">{totalVolunteersCount}</div>
             <p className="text-sm text-gray-600">Total Volunteers</p>
           </Card>
           <Card className="p-6">
             <div className="bg-yellow-100 p-3 rounded-lg w-fit mb-4">
               <CheckCircle className="w-6 h-6 text-yellow-600" />
             </div>
-            <div className="text-gray-900">{pendingBookings.length}</div>
+            <div className="text-gray-900">{pendingBookingsCount}</div>
             <p className="text-sm text-gray-600">Pending Approvals</p>
           </Card>
           <Card className="p-6">
             <div className="bg-purple-100 p-3 rounded-lg w-fit mb-4">
               <Star className="w-6 h-6 text-purple-600" />
             </div>
-            <div className="text-gray-900">{tasks.filter(t => t.status === 'completed').length}</div>
+            <div className="text-gray-900">{completedTasksCount}</div>
             <p className="text-sm text-gray-600">Completed Tasks</p>
           </Card>
         </div>
@@ -261,7 +394,7 @@ export function AdminDashboard() {
               <div className="space-y-4">
                 {tasks.map((task) => (
                   <div
-                    key={task.id}
+                    key={task._id}
                     className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
                   >
                     <div className="flex-1">
@@ -271,7 +404,7 @@ export function AdminDashboard() {
                           variant={
                             task.status === 'active'
                               ? 'default'
-                              : task.status === 'full'
+                              :  task.status === 'completed'
                               ? 'secondary'
                               : 'outline'
                           }
@@ -281,9 +414,9 @@ export function AdminDashboard() {
                       </div>
                       <div className="flex items-center gap-6 text-sm text-gray-600">
                         <span>{new Date(task.date).toLocaleDateString()}</span>
-                        <span>{task.duration}</span>
+                        <span>{task.duration_hours}</span>
                         <span>
-                          {task.booked}/{task.spots} spots filled
+                          {task.filled_spots}/{task.total_spots} spots filled
                         </span>
                       </div>
                     </div>
@@ -319,10 +452,10 @@ export function AdminDashboard() {
                   </thead>
                   <tbody>
                     {volunteers.map((volunteer) => (
-                      <tr key={volunteer.id} className="border-b border-gray-100">
+                      <tr key={volunteer._id} className="border-b border-gray-100">
                         <td className="py-3 px-4 text-gray-900">{volunteer.name}</td>
                         <td className="py-3 px-4 text-gray-600">{volunteer.email}</td>
-                        <td className="py-3 px-4 text-gray-900">{volunteer.totalHours}h</td>
+                        <td className="py-3 px-4 text-gray-900">{volunteer.total_hours}h</td>
                         <td className="py-3 px-4">
                           <Badge variant="secondary" className="capitalize">
                             {volunteer.badge}
@@ -335,7 +468,7 @@ export function AdminDashboard() {
                           </div>
                         </td>
                         <td className="py-3 px-4 text-gray-900">
-                          {volunteer.tasksCompleted}
+                          {volunteer.completed_opportunities}
                         </td>
                       </tr>
                     ))}
@@ -352,26 +485,27 @@ export function AdminDashboard() {
               <div className="space-y-4">
                 {pendingBookings.map((booking) => (
                   <div
-                    key={booking.id}
+                    key={booking._id}
                     className="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg"
                   >
                     <div>
-                      <div className="text-gray-900 mb-1">{booking.volunteer}</div>
+                      <div className="text-gray-900 mb-1">{booking.volunteer_id.name}</div>
                       <div className="text-sm text-gray-600">
-                        {booking.task} • {new Date(booking.date).toLocaleDateString()}
+                        {booking.opportunity_id.title} • {new Date(booking.opportunity_id.date).toLocaleDateString()}
                       </div>
+                      <div className="text-sm text-gray-500">{booking.volunteer_id.email}</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
-                        onClick={() => handleApproveBooking(booking.id)}
+                        onClick={() => handleApproveBooking(booking._id)}
                       >
                         Approve
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleRejectBooking(booking.id)}
+                        onClick={() => handleRejectBooking(booking._id)}
                       >
                         Reject
                       </Button>
