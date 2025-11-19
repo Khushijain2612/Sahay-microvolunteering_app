@@ -2,14 +2,15 @@
   "name": "sahay-microvolunteering-app",
   "version": "1.0.0",
   "description": "Microvolunteering platform",
+  "main": "Sahay-Backend/server.js",
   "scripts": {
     "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
     "frontend": "cd client && npm run dev",
     "backend": "cd Sahay-Backend && npm run dev",
     "build": "cd client && npm run build",
-    "start": "cd Sahay-Backend && npm start",
-    "install-all": "npm install && cd client && npm install && cd ../Sahay-Backend && npm install",
-    "render-build": "npm run install-all && npm run build"
+    "start": "cd Sahay-Backend && node server.js",
+    "install-all": "cd Sahay-Backend && npm install",
+    "render-build": "npm run install-all"
   },
   "devDependencies": {
     "concurrently": "^8.2.0"
