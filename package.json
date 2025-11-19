@@ -4,7 +4,8 @@
   "description": "Microvolunteering platform",
   "main": "Sahay-Backend/server.js",
   "scripts": {
-    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"nodemon server.js",
+  
     "frontend": "cd client && npm run dev",
     "backend": "cd Sahay-Backend && npm run dev",
     "build": "cd client && npm run build",
