@@ -1,214 +1,92 @@
-// MICROVOLUNTEERING API - COMPLETE BACKEND
-// NO PASSPORT - NO EXTERNAL FILES
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import dotenv from 'dotenv';
 
-const express = require('express');
+// Import routes
+import authRoutes from './routes/auth.js';
+import opportunityRoutes from './routes/opportunities.js';
+
+dotenv.config();
+
 const app = express();
+
+// CORS - Allow all origins for development
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// Handle preflight requests
+app.options('*', cors());
 
 // Middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-console.log('✅ Server starting...');
-
-// =====================
-// SIMPLE SESSION SYSTEM
-// =====================
-let sessions = {};
-let nextSessionId = 1;
-
-function createSession(user) {
-    const sessionId = nextSessionId++;
-    const userCopy = { ...user };
-    delete userCopy.password;
-    sessions[sessionId] = userCopy;
-    return sessionId;
-}
-
-function getSession(sessionId) {
-    return sessions[sessionId];
-}
-
-function destroySession(sessionId) {
-    delete sessions[sessionId];
-}
-
-// =====================
-// MOCK DATABASE
-// =====================
-let users = [
-    {
-        id: 1,
-        name: 'Admin User',
-        email: 'admin@example.com',
-        password: '123456',
-        role: 'admin',
-        totalHours: 50,
-        badge: 'silver'
-    }
-];
-
-let opportunities = [
-    {
-        id: 1,
-        title: 'Beach Cleanup',
-        description: 'Help clean up the local beach',
-        category: 'environment',
-        date: '2024-02-15',
-        duration: 3,
-        location: 'Main Beach',
-        maxVolunteers: 10,
-        currentVolunteers: [],
-        status: 'active'
-    }
-];
-
-// =====================
-// MIDDLEWARE
-// =====================
-function requireAuth(req, res, next) {
-    const sessionId = req.headers.authorization;
-    const user = getSession(sessionId);
-    
-    if (user) {
-        req.user = user;
-        req.sessionId = sessionId;
-        next();
-    } else {
-        res.status(401).json({
-            success: false,
-            message: 'Authentication required'
-        });
-    }
-}
-
-// =====================
-// AUTHENTICATION ROUTES
-// =====================
-
-// Register
-app.post('/api/auth/register', (req, res) => {
-    try {
-        const { name, email, password } = req.body;
-
-        const existingUser = users.find(user => user.email === email);
-        if (existingUser) {
-            return res.status(400).json({
-                success: false,
-                message: 'User already exists'
-            });
-        }
-
-        const newUser = {
-            id: users.length + 1,
-            name,
-            email,
-            password,
-            role: 'volunteer',
-            totalHours: 0,
-            badge: 'bronze'
-        };
-
-        users.push(newUser);
-        const sessionId = createSession(newUser);
-
-        res.status(201).json({
-            success: true,
-            message: 'Registration successful!',
-            user: getSession(sessionId),
-            sessionId
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Registration failed'
-        });
-    }
-});
-
-// Login
-app.post('/api/auth/login', (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        const user = users.find(u => u.email === email && u.password === password);
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid email or password'
-            });
-        }
-
-        const sessionId = createSession(user);
-
-        res.json({
-            success: true,
-            message: 'Login successful!',
-            user: getSession(sessionId),
-            sessionId
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Login failed'
-        });
-    }
-});
-
-// Get current user
-app.get('/api/auth/me', requireAuth, (req, res) => {
-    res.json({
-        success: true,
-        user: req.user
-    });
-});
-
-// =====================
-// OPPORTUNITIES ROUTES
-// =====================
-
-// Get all opportunities
-app.get('/api/opportunities', (req, res) => {
-    try {
-        const opportunitiesWithDetails = opportunities.map(opp => ({
-            ...opp,
-            availableSpots: opp.maxVolunteers - opp.currentVolunteers.length
-        }));
-
-        res.json({
-            success: true,
-            opportunities: opportunitiesWithDetails
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch opportunities'
-        });
-    }
-});
-
-// =====================
-// HOME ROUTE
-// =====================
+// Health check endpoint
 app.get('/', (req, res) => {
-    res.json({
-        message: '🚀 Microvolunteering API is running!',
-        endpoints: [
-            'POST /api/auth/register',
-            'POST /api/auth/login',
-            'GET  /api/auth/me',
-            'GET  /api/opportunities'
-        ]
-    });
+  res.json({ 
+    message: 'Sahay Backend is running!',
+    timestamp: new Date().toISOString(),
+    status: 'OK'
+  });
 });
 
-// =====================
-// START SERVER
-// =====================
+// API root endpoint
+app.get('/api', (req, res) => {
+  res.json({ 
+    message: "Microvolunteering API is running!",
+    endpoints: [
+      "POST /api/auth/register",
+      "POST /api/auth/login", 
+      "GET /api/auth/me",
+      "GET /api/opportunities",
+      "GET /api/health"
+    ]
+  });
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK',
+    message: 'Server is healthy',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/opportunities', opportunityRoutes);
+
+// 404 handler for API routes
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ 
+    error: 'API endpoint not found',
+    availableEndpoints: [
+      'GET /api',
+      'GET /api/health',
+      'POST /api/auth/register',
+      'POST /api/auth/login',
+      'GET /api/opportunities'
+    ]
+  });
+});
+
+// Database connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/sahay-app';
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ MongoDB connected successfully'))
+  .catch(err => {
+    console.log('❌ MongoDB connection error:', err.message);
+    console.log('Using URI:', MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)@/, 'mongodb+srv://USER:PASSWORD@'));
+  });
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log('✅ Server running on port', PORT);
-    console.log('📍 http://localhost:' + PORT);
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📍 Health check: https://sahay-microwolunteering-app-4.onrender.com/api/health`);
+  console.log(`🌐 CORS enabled for all origins`);
 });
